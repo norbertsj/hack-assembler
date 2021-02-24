@@ -90,37 +90,32 @@
  * 
  */
 
+const programMemoryPool = [];
+const dataMemoryPool = [
+    { symbol: 'R0', alternate: 'SP', value: 0 },
+    { symbol: 'R1', alternate: 'LCL', value: 1 },
+    { symbol: 'R2', alternate: 'ARG', value: 2 },
+    { symbol: 'R3', alternate: 'THIS', value: 3 },
+    { symbol: 'R4', alternate: 'THAT', value: 4 },
+    { symbol: 'R5', value: 5 },
+    { symbol: 'R6', value: 6 },
+    { symbol: 'R7', value: 7 },
+    { symbol: 'R8', value: 8 },
+    { symbol: 'R9', value: 9 },
+    { symbol: 'R10', value: 10 },
+    { symbol: 'R11', value: 11 },
+    { symbol: 'R12', value: 12 },
+    { symbol: 'R13', value: 13 },
+    { symbol: 'R14', value: 14 },
+    { symbol: 'R15', value: 15 },
+    { symbol: 'SCREEN', value: 16384 },
+    { symbol: 'KBD', value: 24576 }
+];
+let latestCustomVariable = 16;
+
 function getComputationValue(){}
 function getDestinationValue(){}
 function getJumpValue(){}
-
-// hmm, wait, isnt label an instruction number???
-const LABEL_START = 16; // probably should change after variables are introduced
-const labels = [];
-
-function parseLabel(line) {
-    const label = line.replace(/\(|\)/gm, '');
-
-    const existing = labels.find(l => l.name === label);
-    if (existing) {
-        return existing.value;
-    }
-
-    const last = labels[labels.length - 1];
-    let value;
-    if (last) {
-        value = last.value + 1;
-    } else {
-        value = LABEL_START;
-    }
-
-    labels.push({ name: label, value });
-    return value;
-}
-
-function stripCommentsAndWhitespace(line) {
-    return line.replace(/\/+.*$/gm, '').trim();
-}
 
 function isLabel(line) {
     return line.startsWith('(') && line.endsWith(')');
@@ -130,32 +125,85 @@ function isAinstruction(line) {
     return line.startsWith('@');
 }
 
+function stripCommentsAndWhitespace(input) {
+    const result = [];
+
+    for (const line of input) {
+        const stripped = line.replace(/\/+.*$/gm, '').trim();
+
+        if (stripped.length > 0) {
+            result.push(stripped);
+        }
+    }
+
+    return result;
+}
+
+function parseLabels(input) {
+    const result = [];
+
+    for (const line of input) {
+        if (isLabel(line)) {
+            programMemoryPool.push({ symbol: line.replace(/\(|\)/g, ''), value: result.length });
+        } else {
+            result.push(line);
+        }
+    }
+   
+    return result;
+}
+
+function parseSymbols(input) {
+    const result = [];
+
+    for (const line of input) {
+        if (isAinstruction(line)) {
+            const symbol = line.replace('@', '');
+            const variable = dataMemoryPool.find(i => i.symbol === symbol || i.alternate === symbol);
+            const label = programMemoryPool.find(i => i.symbol === symbol);
+
+            if (label) {
+                result.push(`@${label.value}`);
+            } else if (variable) {
+                result.push(`@${variable.value}`);
+            } else {
+                latestCustomVariable = latestCustomVariable === 16 ? latestCustomVariable : latestCustomVariable + 1;
+                dataMemoryPool.push({ symbol, value: latestCustomVariable });
+                result.push(`@${latestCustomVariable}`);
+            }
+        } else {
+            result.push(line);
+        }
+    }
+
+    return result;
+}
+
 function assemble(input) {
-    const output = [];
+    const result = [];
 
     if (!input || input.length === 0) {
         throw new Error('Invalid input');
     }
 
-    for (let line of input) {
-        line = stripCommentsAndWhitespace(line);
+    const preParsed = parseSymbols(parseLabels(stripCommentsAndWhitespace(input)));
+    console.log(preParsed);
 
-        if (line.length > 0) {
-            let parsed;
+    for (const line of preParsed) {
+        if (isAinstruction(line)) {
+            let binary = parseInt(line.replace('@', '')).toString(2);
 
-            if (isLabel(line)) {
-                // handle label
-            } else if (isAinstruction(line)) {
-                // handle A instruction and symbols
-            } else {
-                // handle C instruction
+            while (binary.length !== 15) {
+                binary = '0' + binary;
             }
-
-            output.push(parsed);
+            
+            result.push(binary);
+        } else {
+            // parse C instruction
         }
     }
 
-    return output;
+    return result;
 }
 
 function readInput() {
