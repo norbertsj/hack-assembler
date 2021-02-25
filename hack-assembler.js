@@ -7,11 +7,11 @@
  * non-negative decimal constant
  * symbol referring to such a constant
  * binary syntax: 0 <value>
- * 
+ *
  * C-instruction
  * dest = comp ; jump
  * binary syntax: 1 1 1 a c1 c2 c3 c4 c5 c6 d1 d2 d2 j1 j2 j3
- * 
+ *
  * Computation table
  * |-----------|----|----|----|----|----|----|
  * |computation| c1 | c2 | c3 | c4 | c5 | c6 |
@@ -37,7 +37,7 @@
  * |-----|-----|----|----|----|----|----|----|
  * | a=0 | a=1 |                             |
  * |-----|-----|----|----|----|----|----|----|
- * 
+ *
  * Destination table
  * |-----------|----|----|----|
  * |destination| d1 | d2 | d3 |
@@ -51,7 +51,7 @@
  * |    AD     |  1 |  1 |  0 |
  * |   AMD     |  1 |  1 |  1 |
  * |-----------|----|----|----|
- * 
+ *
  * Jump table
  * |-----------|----|----|----|
  * |   jump    | j1 | j2 | j3 |
@@ -65,7 +65,7 @@
  * |   JLE     |  1 |  1 |  0 |
  * |   JMP     |  1 |  1 |  1 |
  * |-----------|----|----|----|
- * 
+ *
  * Pre-defined symbols
  * |--------|-------|
  * | symbol | value |
@@ -84,11 +84,68 @@
  * | THIS   |   3   |
  * | THAT   |   4   |
  * |--------|-------|
- * 
+ *
  * Label declaration: (label)
  * Variable declaration: @variableName
- * 
+ *
  */
+
+const computationTable0 = {
+    '0': '101010',
+    '1': '111111',
+    '-1': '111010',
+    'D': '001100',
+    'A': '110000',
+    '!D': '001101',
+    '!A': '110001',
+    '-D': '001111',
+    '-A': '110011',
+    'D+1': '011111',
+    'A+1': '110111',
+    'D-1': '001110',
+    'A-1': '110010',
+    'D+A': '000010',
+    'D-A': '010011',
+    'A-D': '000111',
+    'D&A': '000000',
+    'D|A': '010101'
+}
+
+const computationTable1 = {
+    'M': '110000',
+    '!M': '110001',
+    '-M': '110011',
+    'M+1': '110111',
+    'M-1': '110010',
+    'D+M': '000010',
+    'D-M': '010011',
+    'M-D': '000111',
+    'D&M': '000000',
+    'D|M': '010101'
+}
+
+const destinationTable = {
+    '0': '000',
+    'null': '000',
+    'M': '001',
+    'D': '010',
+    'MD': '011',
+    'A': '100',
+    'AM': '101',
+    'AD': '110',
+    'AMD': '111'
+}
+
+const jumpTable = {
+    'null': '000',
+    'JGT': '001',
+    'JEQ': '010',
+    'JGE': '011',
+    'JLT': '100',
+    'JNE': '101',
+    'JLE': '110',
+    'JMP': '111'
+};
 
 const programMemoryPool = [];
 const dataMemoryPool = [
@@ -113,9 +170,19 @@ const dataMemoryPool = [
 ];
 let latestCustomVariable = 16;
 
-function getComputationValue(){}
-function getDestinationValue(){}
-function getJumpValue(){}
+function getComputationAndA(value) {
+    let a = 0;
+    let comp;
+
+    if (typeof computationTable1[value] !== 'undefined') {
+        a = 1;
+        comp = computationTable1[value];
+    } else {
+        comp = computationTable0[value];
+    }
+
+    return { a, comp };
+}
 
 function isLabel(line) {
     return line.startsWith('(') && line.endsWith(')');
@@ -149,7 +216,7 @@ function parseLabels(input) {
             result.push(line);
         }
     }
-   
+
     return result;
 }
 
@@ -187,19 +254,39 @@ function assemble(input) {
     }
 
     const preParsed = parseSymbols(parseLabels(stripCommentsAndWhitespace(input)));
-    console.log(preParsed);
 
     for (const line of preParsed) {
         if (isAinstruction(line)) {
+            // parse A instruction
+
             let binary = parseInt(line.replace('@', '')).toString(2);
 
-            while (binary.length !== 15) {
+            while (binary.length !== 16) {
                 binary = '0' + binary;
             }
-            
+
             result.push(binary);
         } else {
-            // parse C instruction
+            // parse C instruction (dest = comp; jump)
+
+            let a = 0;
+            let comp;
+            let dest = destinationTable['null'];
+            let jump = jumpTable['null'];
+
+            if (line.includes('=')) {
+                const splitted = line.split('=');
+                dest = destinationTable[splitted[0]];
+
+                ({a, comp } = getComputationAndA(splitted[1]));
+            } else {
+                const splitted = line.split(';');
+                jump = jumpTable[splitted[1]];
+
+                ({a, comp } = getComputationAndA(splitted[0]));
+            }
+
+            result.push('111' + a + comp + dest + jump)
         }
     }
 
@@ -254,7 +341,11 @@ function readInput() {
         '    M=M+1',
         '',
         '    @FILL',
-        '    0;JMP'
+        '    0;JMP',
+        '',
+        '// testing some stuff',
+        'AM=D-1',
+        'AMD=1'
      ]
 }
 
