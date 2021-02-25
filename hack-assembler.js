@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 
+const { createReadStream, createWriteStream } = require('fs');
+const { createInterface } = require('readline');
+
 /**
  * A-instruction
  * @value
@@ -88,6 +91,10 @@
  * Label declaration: (label)
  * Variable declaration: @variableName
  *
+ * @todo:
+ *  a) syntax validation
+ *  b) file/path validation
+ *  c) add proper error handling
  */
 
 const computationTable0 = {
@@ -293,62 +300,35 @@ function assemble(input) {
     return result;
 }
 
-function readInput() {
-    return [
-        '// Fill.asm',
-        '(LOOP)',
-        '    @SCREEN  // just a test comment',
-        '    D=A',
-        '    @address',
-        '    M=D',
-        '',
-        '    @KBD    ',
-        '    D=M//comment',
-        '    @FILL',
-        '    D;JGT',
-        '    @BLANK',
-        '    D;JEQ',
-        '',
-        '(BLANK)',
-        '    @address',
-        '    D=M',
-        '    @KBD',
-        '    D=D-A',
-        '    @LOOP',
-        '    D;JEQ',
-        '',
-        '    @address',
-        '    A=M',
-        '    M=0',
-        '    @address',
-        '    M=M+1',
-        '',
-        '    @BLANK',
-        '    0;JMP',
-        '',
-        '(FILL)',
-        '    @address',
-        '    D=M',
-        '    @KBD',
-        '    D=D-A',
-        '    @LOOP',
-        '    D;JEQ',
-        '',
-        '    @address',
-        '    A=M',
-        '    M=-1',
-        '    @address',
-        '    M=M+1',
-        '',
-        '    @FILL',
-        '    0;JMP',
-        '',
-        '// testing some stuff',
-        'AM=D-1',
-        'AMD=1'
-     ]
+function main() {
+    const args = process.argv.slice(2);
+    const path = args[0];
+
+    if (!path) {
+        console.log('Please provide ASM file as an argument (local dir only)');
+        return;
+    }
+
+    const fileName = path.split('.')[0];
+    const input = [];
+
+    console.log(`Assembling ${fileName}.hack file...`)
+
+    const rl = createInterface({
+        input: createReadStream(path),
+        crlfDelay: Infinity
+    });
+
+    rl.on('line', (line) => input.push(line));
+    rl.on('close', () => {
+        const output = assemble(input);
+        const wstream = createWriteStream(`${fileName}.hack`);
+        for (const line of output) {
+            wstream.write(line + '\n');
+        }
+        
+        console.log('Done');
+    });
 }
 
-const input = readInput();
-const output = assemble(input);
-console.log(output);
+main();
