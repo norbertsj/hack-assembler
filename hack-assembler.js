@@ -175,7 +175,7 @@ const dataMemoryPool = [
     { symbol: 'SCREEN', value: 16384 },
     { symbol: 'KBD', value: 24576 }
 ];
-let latestCustomVariable = 16;
+let latestCustomVariable = 15;
 
 function getComputationAndA(value) {
     let a = 0;
@@ -240,10 +240,12 @@ function parseSymbols(input) {
                 result.push(`@${label.value}`);
             } else if (variable) {
                 result.push(`@${variable.value}`);
-            } else {
-                latestCustomVariable = latestCustomVariable === 16 ? latestCustomVariable : latestCustomVariable + 1;
+            } else if (isNaN(parseInt(symbol))) {
+                latestCustomVariable += 1;
                 dataMemoryPool.push({ symbol, value: latestCustomVariable });
                 result.push(`@${latestCustomVariable}`);
+            } else {
+                result.push(line);
             }
         } else {
             result.push(line);
@@ -326,7 +328,7 @@ function main() {
         for (const line of output) {
             wstream.write(line + '\n');
         }
-        
+
         console.log('Done');
     });
 }
